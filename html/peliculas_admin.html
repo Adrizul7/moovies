@@ -1,55 +1,17 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <title>Admin - Películas</title>
     <link rel="stylesheet" href="../css/styles.css">
     <style>
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            overflow-y: auto;
-        }
-
-        .modal-content {
-            background: white;
-            margin: 2% auto;
-            padding: 20px;
-            width: 90%;
-            max-width: 500px;
-            border-radius: 8px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .form-group {
-            margin-bottom: 12px;
-        }
-
-        .form-group label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); overflow-y: auto; }
+        .modal-content { background: white; margin: 2% auto; padding: 20px; width: 90%; max-width: 500px; border-radius: 8px; max-height: 90vh; overflow-y: auto; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
     </style>
 </head>
-
 <body class="admin-body">
     <header>
         <a href="admin.html" style="color:white; text-decoration:none; margin-left:20px;">← Volver al Menú Admin</a>
@@ -80,149 +42,124 @@
             <h3 style="margin-top:0;">Registrar Nueva Película</h3>
             <form id="formPeli">
                 <div class="form-group"><label>Título</label><input type="text" id="title" required></div>
-                <div class="form-group"><label>Descripción Corta</label><input type="text" id="description" required>
-                </div>
+                <div class="form-group"><label>Descripción Corta</label><input type="text" id="description" required></div>
                 <div class="form-group"><label>Resumen</label><textarea id="summary" rows="3"></textarea></div>
                 <div class="form-group"><label>URL Imagen</label><input type="text" id="image"></div>
                 <div class="form-group"><label>URL Trailer</label><input type="text" id="trailer"></div>
-
                 <div class="form-group">
                     <label>Director</label>
-                    <select id="selectDirector" required>
-                        <option value="">Cargando directores...</option>
-                    </select>
+                    <select id="selectDirector" required><option value="">Cargando...</option></select>
                 </div>
                 <div class="form-group">
                     <label>Género Principal</label>
-                    <select id="selectGenre" required>
-                        <option value="">Cargando géneros...</option>
-                    </select>
+                    <select id="selectGenre" required><option value="">Cargando...</option></select>
                 </div>
-
                 <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button type="button" onclick="cerrarModal()" style="padding:10px;">Cancelar</button>
-                    <button type="submit" class="btn-moo" style="padding:10px 20px;">Guardar Película</button>
+                    <button type="button" onclick="cerrarModal()">Cancelar</button>
+                    <button type="submit" class="btn-moo">Guardar Película</button>
                 </div>
             </form>
         </div>
     </div>
 
-   <script>
+<script>
     let editMode = false;
     let currentMovieId = null;
 
-    // 1. CARGAR LISTADO DE PELÍCULAS
+    // 1. CARGAR TABLA
     async function cargarTabla() {
         try {
             const response = await fetch('../api/list_movie.php');
             const movies = await response.json();
             const tbody = document.getElementById('tablaPelisBody');
-            
             tbody.innerHTML = movies.map(m => `
                 <tr>
                     <td>${m.id}</td>
                     <td>${m.title}</td>
                     <td>${m.description ? m.description.substring(0, 50) : ''}...</td>
                     <td>
-                        <button onclick="abrirModal(${m.id})" title="Editar" style="cursor:pointer; background:none; border:none;">✏️</button>
-                        <button onclick="eliminarPeli(${m.id})" title="Eliminar" style="cursor:pointer; background:none; border:none;">🗑️</button>
+                        <button onclick="abrirModal(${m.id})" style="cursor:pointer; background:none; border:none;">✏️</button>
+                        <button onclick="eliminarPeli(${m.id})" style="cursor:pointer; background:none; border:none;">🗑️</button>
                     </td>
                 </tr>
             `).join('');
-        } catch (error) {
-            console.error("Error al cargar la tabla:", error);
+        } catch (e) { console.error("Error al cargar tabla:", e); }
+    }
+
+    // 2. ELIMINAR PELÍCULA (La función que faltaba)
+    async function eliminarPeli(id) {
+        if (!confirm("¿Estás seguro de que deseas eliminar esta película?")) return;
+
+        try {
+            const res = await fetch(`../api/delete_movie.php?id=${id}`, { method: 'DELETE' });
+            const result = await res.json();
+
+            if (result.success) {
+                alert("Película eliminada correctamente");
+                cargarTabla(); // Refrescar la lista
+            } else {
+                alert("Error al eliminar: " + (result.error || "Fallo desconocido"));
+            }
+        } catch (e) {
+            console.error("Error en eliminar:", e);
+            alert("No se pudo conectar con el servidor para eliminar.");
         }
     }
 
-    // 2. CARGAR SELECTS (DIRECTORES Y GÉNEROS)
+    // 3. CARGAR SELECTS
     async function cargarAuxiliares() {
         try {
-            const [resPeople, resGenres] = await Promise.all([
-                fetch('../api/list_people.php'),
+            const [resP, resG] = await Promise.all([
+                fetch('../api/list_people.php'), 
                 fetch('../api/list_genres.php')
             ]);
-
-            if (!resPeople.ok || !resGenres.ok) throw new Error("Error en catálogos");
-
-            const people = await resPeople.json();
-            const genres = await resGenres.json();
-
-            // Llenar Director (Filtrados por rol director en PHP)
-            document.getElementById('selectDirector').innerHTML =
-                '<option value="">Selecciona director</option>' +
+            const people = await resP.json();
+            const genres = await resG.json();
+            
+            document.getElementById('selectDirector').innerHTML = '<option value="">Selecciona director</option>' + 
                 people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-
-            // Llenar Género
-            document.getElementById('selectGenre').innerHTML =
-                '<option value="">Selecciona género</option>' +
+            document.getElementById('selectGenre').innerHTML = '<option value="">Selecciona género</option>' + 
                 genres.map(g => `<option value="${g.id}">${g.type}</option>`).join('');
-
-        } catch (error) {
-            console.error("Error en auxiliares:", error);
-        }
+        } catch (e) { console.error("Error en auxiliares:", e); }
     }
 
-    // 3. ABRIR MODAL (CREAR O EDITAR)
+    // 4. ABRIR MODAL
     async function abrirModal(id = null) {
+        await cargarAuxiliares();
         const modal = document.getElementById('modalPeli');
-        const tituloModal = modal.querySelector('h3');
-        const form = document.getElementById('formPeli');
-        
         modal.style.display = 'block';
         
-        // Esperamos a que los selects tengan datos antes de intentar seleccionar un valor
-        await cargarAuxiliares();
-
         if (id) {
-            editMode = true;
+            editMode = true; 
             currentMovieId = id;
-            tituloModal.innerText = "Editar Película";
-            await llenarDatosEdicion(id);
-        } else {
-            editMode = false;
-            currentMovieId = null;
-            tituloModal.innerText = "Registrar Nueva Película";
-            form.reset();
-        }
-    }
-
-    // 4. OBTENER DATOS DE UNA PELI ESPECÍFICA PARA EL FORM
-    async function llenarDatosEdicion(id) {
-        try {
+            modal.querySelector('h3').innerText = "Editar Película";
             const res = await fetch(`../api/get_movie_details.php?id=${id}`);
             const m = await res.json();
             
-            if (m.error) throw new Error(m.error);
-
-            // Rellenar campos simples
             document.getElementById('title').value = m.title || '';
             document.getElementById('description').value = m.description || '';
             document.getElementById('summary').value = m.summary || '';
             document.getElementById('image').value = m.image || '';
             document.getElementById('trailer').value = m.trailer || '';
-            
-            // Rellenar selects (IDs de las tablas movie_cast y movies_genres)
             document.getElementById('selectDirector').value = m.director_id || '';
             document.getElementById('selectGenre').value = m.genre_id || '';
-            
-        } catch (error) {
-            alert("No se pudieron cargar los detalles de la película");
-            console.error(error);
+        } else {
+            editMode = false; 
+            currentMovieId = null;
+            modal.querySelector('h3').innerText = "Registrar Nueva Película";
+            document.getElementById('formPeli').reset();
         }
     }
 
-    // 5. CERRAR MODAL
-    function cerrarModal() {
-        document.getElementById('modalPeli').style.display = 'none';
-        document.getElementById('formPeli').reset();
+    function cerrarModal() { 
+        document.getElementById('modalPeli').style.display = 'none'; 
     }
 
-    // 6. GUARDAR (INSERT O UPDATE)
+    // 5. GUARDAR / ACTUALIZAR
     document.getElementById('formPeli').onsubmit = async (e) => {
         e.preventDefault();
-        
         const data = {
-            id: currentMovieId, // Se envía null si es nueva, o el ID si es edición
+            id: currentMovieId,
             title: document.getElementById('title').value,
             description: document.getElementById('description').value,
             summary: document.getElementById('summary').value,
@@ -232,7 +169,6 @@
             genre_id: document.getElementById('selectGenre').value
         };
 
-        // Decidir a qué endpoint disparar
         const url = editMode ? '../api/update_movie.php' : '../api/save_movie_full.php';
 
         try {
@@ -242,43 +178,23 @@
                 body: JSON.stringify(data)
             });
 
-            const result = await res.json();
+const result = await res.json();
 
-            if (result.status === "success") {
-                alert(editMode ? "Película actualizada con éxito" : "Película creada con éxito");
-                cerrarModal();
-                cargarTabla();
-            } else {
-                alert("Error: " + result.message);
-            }
-        } catch (error) {
-            console.error("Error al procesar:", error);
-            alert("Error crítico en el servidor");
+if (result.success) { 
+    // BORRA la palabra "Error:" que tienes aquí
+    alert(result.message || "¡Logrado! Película guardada."); 
+    cerrarModal();
+    cargarTabla(); 
+} else {
+    // Solo aquí debe ir la palabra Error
+    alert("Error real del servidor: " + (result.error || "No se pudo guardar"));
+}
+        } catch (e) {
+            console.error("Error en guardar:", e);
+            alert("No se pudo conectar con el servidor para guardar.");
         }
     };
-
-    // 7. ELIMINAR PELÍCULA
-    async function eliminarPeli(id) {
-        if (!confirm("¿Estás seguro? Se borrarán también sus vínculos de director y género.")) return;
-
-        try {
-            const response = await fetch(`../api/delete_movie.php?id=${id}`);
-            const result = await response.json();
-
-            if (result.success) {
-                alert(result.message);
-                cargarTabla();
-            } else {
-                alert("Error: " + (result.message || result.error));
-            }
-        } catch (error) {
-            console.error("Error al eliminar:", error);
-        }
-    }
-
-    // Iniciar carga al abrir la página
     window.onload = cargarTabla;
 </script>
 </body>
-
 </html>

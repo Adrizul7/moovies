@@ -9,35 +9,49 @@ try {
     $conexionClase = new ConexionBD();
     $db = $conexionClase->getConexion();
 
-    $id       = $_POST['id'];
-    $username = $_POST['username'];
-    $name     = $_POST['name'];
-    $email    = $_POST['email'];
-    $password = $_POST['password'];
-    $milk     = $_POST['milk_type'];
+    // 1. INTENTAR LEER COMO JSON (Para Fetch API)
+    $json = file_get_contents('php://input');
+    $data = json_decode($json, true);
 
-    // 1. Actualizar datos básicos del usuario
-    if (!empty($password)) {
-        // Si el usuario escribió algo en el campo de contraseña, la actualizamos
+    // 2. SI NO ES JSON, INTENTAR LEER COMO FORMULARIO ($_POST)
+    if (!$data) {
+        $data = $_POST;
+    }
+
+    // Si después de ambos intentos no hay nada, lanzamos error
+    if (empty($data)) throw new Exception("No se recibieron datos en el servidor.");
+
+    $id          = $data['id'] ?? null;
+    $username    = $data['username'] ?? '';
+    $name        = $data['name'] ?? '';
+    $email       = $data['email'] ?? '';
+    $milk        = $data['milk_type'] ?? '';
+    $passwordRaw = $data['password'] ?? ''; 
+
+    if (!$id) throw new Exception("Falta el ID del usuario.");
+
+    // --- PROCESO DE ENCRIPTACIÓN Y ACTUALIZACIÓN ---
+    if (!empty($passwordRaw)) {
+        // Generamos el hash seguro
+        $passwordHash = password_hash($passwordRaw, PASSWORD_BCRYPT);
+        
         $sql = "UPDATE users SET username = ?, name = ?, email = ?, password = ? WHERE id = ?";
         $stmt = $db->prepare($sql);
-        $stmt->execute(array($username, $name, $email, $password, $id));
+        $stmt->execute(array($username, $name, $email, $passwordHash, $id));
     } else {
-        // Si dejó la contraseña vacía, solo actualizamos el resto
+        // Si no hay password nueva, NO tocamos la columna password
         $sql = "UPDATE users SET username = ?, name = ?, email = ? WHERE id = ?";
         $stmt = $db->prepare($sql);
         $stmt->execute(array($username, $name, $email, $id));
     }
 
-    // 2. Actualizar la relación con la leche
-    // Buscamos el ID de la leche elegida
+    // --- ACTUALIZAR RELACIÓN DE LECHE ---
     $sqlMilk = "SELECT id FROM milks WHERE type = ?";
     $stmtM = $db->prepare($sqlMilk);
     $stmtM->execute(array($milk));
     $milkId = $stmtM->fetchColumn();
 
     if ($milkId) {
-        // Intentamos actualizar; si no existe la relación, la creamos
         $sqlCheck = "SELECT COUNT(*) FROM users_milks WHERE user_id = ?";
         $stmtCheck = $db->prepare($sqlCheck);
         $stmtCheck->execute(array($id));
@@ -53,10 +67,10 @@ try {
         }
     }
 
- echo json_encode(array("success" => true));
+    echo json_encode(array("success" => true, "message" => "Perfil actualizado con éxito"));
 
 } catch (PDOException $e) {
-    $msg = ($e->getCode() == 23000) ? "El nombre de usuario o email ya están en uso por otro perfil." : $e->getMessage();
+    $msg = ($e->getCode() == 23000) ? "El nombre de usuario o email ya están en uso." : $e->getMessage();
     echo json_encode(array("success" => false, "error" => "Error DB: " . $msg));
 } catch (Exception $e) {
     echo json_encode(array("success" => false, "error" => $e->getMessage()));

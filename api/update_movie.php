@@ -27,11 +27,14 @@ try {
     $db->prepare("INSERT INTO movies_genres (movie_id, genre_id) VALUES (?, ?)")
        ->execute(array($data['id'], $data['genre_id']));
 
-    $db->commit();
-    echo json_encode(array("status" => "success"));
+$db->commit();
+    // ANTES: echo json_encode(array("status" => "success"));
+    echo json_encode(array("success" => true, "message" => "Película actualizada correctamente."));
 
 } catch (Exception $e) {
     if(isset($db)) $db->rollBack();
     http_response_code(500);
-    echo json_encode(array("status" => "error", "message" => $e->getMessage()));
+    // ANTES: echo json_encode(array("status" => "error", "message" => $e->getMessage()));
+    echo json_encode(array("success" => false, "error" => $e->getMessage()));
 }
+exit;  

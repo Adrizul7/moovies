@@ -1,57 +1,79 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const id = getMovieId();
+    if (!id) return;
 
-    const res = await fetch(`../api/movie.php?id=${id}`);
-    const data = await res.json();
+    try {
+        const res = await fetch(`../api/movie.php?id=${id}`);
+        const data = await res.json();
 
-    console.log(data);
-    if (!data.success) {
-        alert("Error cargando película");
-        return;
+        console.log("Datos del servidor:", data);
+
+        let peli = null;
+        if (data.movie) {
+            peli = data.movie;
+        } else if (data.id || data.title) {
+            peli = data;
+        }
+
+        const comentarios = data.comments ? data.comments : [];
+
+        if (!peli || (!peli.title && !peli.id)) {
+            alert("No se encontró información de la película en la base de datos.");
+            return;
+        }
+
+        renderMovie(peli);
+        renderComments(comentarios);
+    } catch (error) {
+        console.error("Error cargando la película:", error);
     }
-
-renderMovie(data.movie);
-renderComments(data.comments);
 });
 
 function getMovieId() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('id');
+    return new URLSearchParams(window.location.search).get('id');
 }
 
-function renderMovie(m, cast = {}) {
-    document.getElementById('modalTitle').textContent = m.title;
-    document.getElementById('modalGenre').textContent = m.genres;
+function normalizarImagenTMDB(url) {
+    if (!url || url.trim() === '') return '';
+    return url.replace(/image\.tmdb\.org\/t\/p\/[^/]+\//, 'image.tmdb.org/t/p/w500/');
+}
 
-    document.getElementById('modalSynopsis').value = m.description;
-
-    document.getElementById('modalImg').src = m.image;
-
-    const trailer = document.getElementById('modalTrailerBtn');
-    if (m.trailer) {
-        trailer.href = m.trailer;
-        trailer.style.display = 'inline-flex';
-    } else {
-        trailer.style.display = 'none';
+function renderMovie(m) {
+    document.getElementById('modalTitle').textContent = m.title || 'Sin título';
+    document.getElementById('modalGenre').textContent = m.genres || 'General';
+    
+    const sinopsisTexto = m.summary || m.description || 'Sin descripción disponible.';
+    const sinopsisElem = document.getElementById('modalSynopsis');
+    if (sinopsisElem) {
+        sinopsisElem.value = sinopsisTexto;
     }
 
-    // CAST
-document.getElementById('modalDirector').textContent =
-    (m.directors || '').split(',').join(', ') || '—';
+    const imgElem = document.getElementById('modalImg');
+    const urlNormalizada = normalizarImagenTMDB(m.image);
+    if (urlNormalizada) {
+        imgElem.src = urlNormalizada;
+        imgElem.onerror = null;
+    } else {
+        imgElem.style.display = 'none'; // Si no hay imagen, oculta el elemento
+    }
 
-document.getElementById('modalActores').textContent =
-    (m.actors || '').split(',').join(', ') || '—';
+    const trailerBtn = document.getElementById('modalTrailerBtn');
+    if (m.trailer) {
+        trailerBtn.href = m.trailer;
+        trailerBtn.style.display = 'inline-flex';
+    } else {
+        trailerBtn.style.display = 'none';
+    }
 
-document.getElementById('modalCompositor').textContent =
-    (m.composers || '').split(',').join(', ') || '—';
-
-document.getElementById('modalGuionistas').textContent =
-    (m.writers || '').split(',').join(', ') || '—';
-
+    document.getElementById('modalDirector').textContent = m.directors || '—';
+    document.getElementById('modalActores').textContent = m.actors || '—';
+    document.getElementById('modalCompositor').textContent = m.composers || '—';
+    document.getElementById('modalGuionistas').textContent = m.writers || '—';
 }
 
 function renderComments(comments) {
     const container = document.getElementById('commentsList');
+    if (!container) return;
     container.innerHTML = '';
 
     if (!comments || comments.length === 0) {
@@ -62,102 +84,23 @@ function renderComments(comments) {
     comments.forEach(c => {
         const div = document.createElement('div');
         div.className = 'comment-item';
-
-div.innerHTML = `
-    <strong>${c.username}</strong>
-    <p>${c.comment}</p>
-    <p>${'🥛'.repeat(c.rating)}</p>
-
-    <button onclick="vote(${c.id}, 1)">
-        👍 ${c.likes || 0}
-    </button>
-
-    <button onclick="vote(${c.id}, -1)">
-        👎 ${c.dislikes || 0}
-    </button>
-`;
-
+        div.innerHTML = `
+            <strong>${c.username || 'Anónimo'}</strong>
+            <p>${c.comment || c.content || 'Sin texto'}</p>
+            <p>${'🥛'.repeat(c.rating || 0)}</p>
+            <div class="comment-actions">
+                <button onclick="vote(${c.id}, 1)">👍 ${c.likes || 0}</button>
+                <button onclick="vote(${c.id}, -1)">👎 ${c.dislikes || 0}</button>
+            </div>
+        `;
         container.appendChild(div);
     });
 }
 
-// rating 
 let currentRating = 0;
-
 function setRating(n) {
     currentRating = n;
-
-    const glasses = document.querySelectorAll('#milkRatingRow .glass');
-
-    glasses.forEach((g, index) => {
-        if (index < n) {
-            g.classList.add('active');
-        } else {
-            g.classList.remove('active');
-        }
+    document.querySelectorAll('#milkRatingRow .glass').forEach((g, i) => {
+        g.classList.toggle('active', i < n);
     });
-}
-
-async function vote(commentId, value) {
-    await fetch('../api/vote.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            comment_id: commentId,
-            vote: value
-        })
-    });
-
-    // reload comments only
-    const id = getMovieId();
-    const res = await fetch(`../api/movie.php?id=${id}`);
-    const data = await res.json();
-    renderComments(data.comments);
-}
-
-async function sendReview() {
-    const movieId = getMovieId();
-    const text = document.getElementById('reviewText').value.trim();
-
-    if (!text) {
-        alert("Escribe un comentario");
-        return;
-    }
-
-    if (currentRating === 0) {
-        alert("Selecciona una calificación");
-        return;
-    }
-
-    try {
-        const res = await fetch('../api/comentario.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                movie_id: movieId,
-                content: text,
-                rating: currentRating
-            })
-        });
-
-        const data = await res.json();
-
-        if (!data.success) {
-            throw new Error(data.error || "Error al comentar");
-        }
-
-        // reset UI
-        document.getElementById('reviewText').value = '';
-        setRating(0);
-
-        // reload comments
-const res2 = await fetch(`../api/movie.php?id=${movieId}`);
-const data2 = await res2.json();
-renderComments(data2.comments);
-
-     } catch (err) {
-        alert(err.message);
-    }
 }
