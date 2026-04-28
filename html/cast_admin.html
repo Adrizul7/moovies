@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <title>Admin - Elenco</title>
     <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); overflow-y: auto; }
+        .modal-content { background: white; margin: 2% auto; padding: 20px; width: 90%; max-width: 500px; border-radius: 8px; max-height: 90vh; overflow-y: auto; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 4px; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .tab-btn { padding: 8px 20px; cursor: pointer; border: 1px solid #ccc; background: #f0f0f0; border-radius: 4px 4px 0 0; }
+        .tab-btn.active { background: #003399; color: white; border-color: #003399; }
+        .tab-section { border: 1px solid #ccc; border-radius: 0 4px 4px 4px; padding: 16px; margin-bottom: 16px; }
+    </style>
 </head>
 <body class="admin-body">
     <header>
@@ -20,202 +30,238 @@
         <table class="admin-table" style="width:100%; border-collapse: collapse; margin-top: 20px;">
             <thead>
                 <tr style="background: var(--azul-fuerte); color:white;">
-                    <th>Persona</th>
-                    <th>Película Asociada</th>
-                    <th>Rol / Puesto</th>
-                    <th>Acciones</th>
+                    <th>Persona</th><th>Película Asociada</th><th>Rol / Puesto</th><th>Acciones</th>
                 </tr>
             </thead>
             <tbody id="tablaCastBody"></tbody>
         </table>
     </main>
 
-    <div id="modalCast" class="modal" style="display:none;">
+    <div id="modalCast" class="modal">
         <div class="modal-content">
-            <h3 id="tituloModalCast">Vincular Reparto</h3>
-            <form id="formCast">
-                <div class="form-group">
-                    <label>Película</label>
-                    <select id="selectMovie" required>
-                        <option value="">Selecciona película</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Persona</label>
-                    <select id="selectPerson" required>
-                        <option value="">Selecciona persona</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Rol / Puesto</label>
-                    <select id="selectRole" required>
-                        <option value="">Selecciona rol</option>
-                    </select>
-                </div>
+            <h3 id="tituloModalCast">Registrar Persona y Vincular</h3>
 
-                <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button type="button" onclick="cerrarModalCast()" style="padding:10px; cursor:pointer;">Cancelar</button>
-                    <button type="submit" class="btn-moo" style="padding:10px 20px;">Guardar Cambios</button>
-                </div>
-            </form>
+            <!-- TABS solo en modo creación -->
+            <div id="tabsSection">
+                <button class="tab-btn active" id="tabNueva" onclick="switchTab('nueva')">➕ Nueva Persona</button>
+                <button class="tab-btn" id="tabExistente" onclick="switchTab('existente')">🔗 Persona Existente</button>
+            </div>
+
+            <!-- SECCIÓN: Nueva Persona -->
+            <div id="seccionNueva" class="tab-section">
+                <form id="formNuevaPerson">
+                    <div class="form-group">
+                        <label>Nombre completo</label>
+                        <input type="text" id="nombreNuevo" placeholder="Ej: Brad Pitt" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Película</label>
+                        <select id="selectMovieNueva" required><option value="">Selecciona película</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Rol / Puesto</label>
+                        <select id="selectRoleNueva" required><option value="">Selecciona rol</option></select>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+                        <button type="button" onclick="cerrarModalCast()">Cancelar</button>
+                        <button type="submit" class="btn-moo">Guardar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- SECCIÓN: Persona Existente / Editar -->
+            <div id="seccionExistente" class="tab-section" style="display:none;">
+                <form id="formCast">
+                    <div class="form-group">
+                        <label>Película</label>
+                        <select id="selectMovie" required><option value="">Selecciona película</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Persona</label>
+                        <select id="selectPerson" required><option value="">Selecciona persona</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Rol / Puesto</label>
+                        <select id="selectRole" required><option value="">Selecciona rol</option></select>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+                        <button type="button" onclick="cerrarModalCast()">Cancelar</button>
+                        <button type="submit" class="btn-moo">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+
         </div>
     </div>
 
-    <script>
-        let editMode = false;
-        let currentData = { movie_id: null, person_id: null, role_id: null };
+<script>
+    let editMode = false;
+    let currentData = { movie_id: null, person_id: null, role_id: null };
 
-        // 1. CARGAR TABLA PRINCIPAL
-        async function cargarTablaCast() {
-            try {
-                const response = await fetch('../api/list_cast.php');
-                const cast = await response.json();
-                const tbody = document.getElementById('tablaCastBody');
-                tbody.innerHTML = '';
+    // TAB SWITCH
+    function switchTab(tab) {
+        const esNueva = tab === 'nueva';
+        document.getElementById('seccionNueva').style.display     = esNueva ? 'block' : 'none';
+        document.getElementById('seccionExistente').style.display = esNueva ? 'none'  : 'block';
+        document.getElementById('tabNueva').classList.toggle('active', esNueva);
+        document.getElementById('tabExistente').classList.toggle('active', !esNueva);
+    }
 
-                cast.forEach(item => {
-                    const tr = document.createElement('tr');
-                    const esDirector = (parseInt(item.role_id) === 2);
-
-                    const acciones = esDirector
-                        ? `<span title="Gestionar desde vista Películas" style="color:gray;">🔒 Director</span>`
-                        : `
-                        <button onclick="abrirModalCast('${item.movie_id}', '${item.person_id}', '${item.role_id}')" style="cursor:pointer; background:none; border:none;">✏️</button>
-                        <button onclick="eliminarVinculo('${item.movie_id}', '${item.person_id}')" style="cursor:pointer; background:none; border:none;">🗑️</button>
+    // 1. CARGAR TABLA
+    async function cargarTablaCast() {
+        try {
+            const response = await fetch('../api/list_cast.php');
+            const cast = await response.json();
+            const tbody = document.getElementById('tablaCastBody');
+            tbody.innerHTML = '';
+            cast.forEach(item => {
+                const tr = document.createElement('tr');
+                const esDirector = parseInt(item.role_id) === 2;
+                const acciones = esDirector
+                    ? `<span style="color:gray;">🔒 Director</span>`
+                    : `
+                        <button onclick="abrirModalCast('${item.movie_id}','${item.person_id}','${item.role_id}')" style="cursor:pointer;background:none;border:none;">✏️</button>
+                        <button onclick="eliminarVinculo('${item.movie_id}','${item.person_id}')" style="cursor:pointer;background:none;border:none;">🗑️</button>
                     `;
+                tr.innerHTML = `
+                    <td>${item.person_name}</td>
+                    <td>${item.movie_title}</td>
+                    <td>${item.role_name}</td>
+                    <td>${acciones}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) { console.error("Error al cargar tabla:", e); }
+    }
 
-                    tr.innerHTML = `
-                        <td>${item.person_name}</td>
-                        <td>${item.movie_title}</td>
-                        <td><span class="badge-rol">${item.role_name}</span></td>
-                        <td>${acciones}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (error) {
-                console.error("Error al cargar tabla:", error);
-            }
-        }
-
-        // 2. CARGAR SELECTS (AUXILIARES)
+    // 2. CARGAR SELECTS
     async function cargarAuxiliaresCast() {
-    try {
-        const [resMovies, resPeople, resRoles] = await Promise.all([
-            fetch('../api/list_movie.php'),
-            fetch('../api/list_people.php'),
-            fetch('../api/list_roles.php')
-        ]);
+        try {
+            const [resMovies, resPeople, resRoles] = await Promise.all([
+                fetch('../api/list_movie.php'),
+                fetch('../api/list_people.php'),
+                fetch('../api/list_roles.php')
+            ]);
+            const movies = await resMovies.json();
+            const people = await resPeople.json();
+            const roles  = await resRoles.json();
+            const rolesSinDirector = roles.filter(r => parseInt(r.id) !== 2);
 
-        const movies = await resMovies.json();
-        const people = await resPeople.json();
-        const roles = await resRoles.json();
+            const optMovies  = '<option value="">Selecciona película</option>'  + movies.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
+            const optPeople  = '<option value="">Selecciona persona</option>'   + people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            const optRoles   = '<option value="">Selecciona rol</option>'       + rolesSinDirector.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
 
-        // 1. Llenar Películas
-        document.getElementById('selectMovie').innerHTML = '<option value="">Selecciona película</option>' + 
-            movies.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
-        
-        // 2. Llenar Personas
-        document.getElementById('selectPerson').innerHTML = '<option value="">Selecciona persona</option>' + 
-            people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-        
-        // 3. Llenar Roles (FILTRANDO AL DIRECTOR)
-        // Usamos parseInt para asegurar que la comparación con el ID 2 sea correcta
-        const rolesSinDirector = roles.filter(r => parseInt(r.id) !== 2);
-
-        document.getElementById('selectRole').innerHTML = '<option value="">Selecciona rol</option>' + 
-            rolesSinDirector.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-
-    } catch (error) {
-        console.error("Error al cargar auxiliares:", error);
+            // Llenar ambas secciones
+            document.getElementById('selectMovie').innerHTML      = optMovies;
+            document.getElementById('selectMovieNueva').innerHTML = optMovies;
+            document.getElementById('selectPerson').innerHTML     = optPeople;
+            document.getElementById('selectRole').innerHTML       = optRoles;
+            document.getElementById('selectRoleNueva').innerHTML  = optRoles;
+        } catch (e) { console.error("Error auxiliares:", e); }
     }
-}
 
-        // 3. ABRIR Y CERRAR MODAL
-     async function abrirModalCast(movie_id = null, person_id = null, role_id = null) {
-    const modal = document.getElementById('modalCast');
-    const titulo = document.getElementById('tituloModalCast');
-    modal.style.display = 'block';
+    // 3. ABRIR MODAL
+    async function abrirModalCast(movie_id = null, person_id = null, role_id = null) {
+        const modal = document.getElementById('modalCast');
+        modal.style.display = 'block';
+        await cargarAuxiliaresCast();
 
-    // 1. Forzamos la carga de los selects y esperamos a que termine
-    await cargarAuxiliaresCast();
+        const tabs = document.getElementById('tabsSection');
 
-    if (movie_id && person_id) {
-        editMode = true;
-        // Guardamos los datos actuales para el UPDATE
-        currentData = { movie_id, person_id, role_id };
-        titulo.innerText = "Editar Vínculo de Elenco";
+        if (movie_id && person_id) {
+            // MODO EDICIÓN: ocultar tabs, mostrar solo existente
+            editMode = true;
+            currentData = { movie_id, person_id, role_id };
+            tabs.style.display = 'none';
+            switchTab('existente');
+            document.getElementById('tituloModalCast').innerText = "Editar Vínculo";
 
-        // 2. Asignamos valores. Si el select de persona sigue vacío, 
-        // verifica que 'person_id' sea el nombre correcto en tu API.
-        document.getElementById('selectMovie').value = movie_id;
-        document.getElementById('selectPerson').value = person_id;
-        document.getElementById('selectRole').value = role_id;
-
-        // Bloqueamos para evitar cambiar la llave primaria accidentalmente
-        document.getElementById('selectMovie').disabled = true;
-        document.getElementById('selectPerson').disabled = true;
-    } else {
-        editMode = false;
-        titulo.innerText = "Vincular Persona a Película";
-        document.getElementById('formCast').reset();
-        document.getElementById('selectMovie').disabled = false;
-        document.getElementById('selectPerson').disabled = false;
-    }
-}
-
-        function cerrarModalCast() {
-            document.getElementById('modalCast').style.display = 'none';
+            document.getElementById('selectMovie').value  = movie_id;
+            document.getElementById('selectPerson').value = person_id;
+            document.getElementById('selectRole').value   = role_id;
+            document.getElementById('selectMovie').disabled  = true;
+            document.getElementById('selectPerson').disabled = true;
+        } else {
+            // MODO CREACIÓN: mostrar tabs, empezar en "Nueva Persona"
+            editMode = false;
+            tabs.style.display = 'block';
+            switchTab('nueva');
+            document.getElementById('tituloModalCast').innerText = "Registrar Persona y Vincular";
+            document.getElementById('formCast').reset();
+            document.getElementById('formNuevaPerson').reset();
+            document.getElementById('selectMovie').disabled  = false;
+            document.getElementById('selectPerson').disabled = false;
         }
+    }
 
-        // 4. GUARDAR (INSERT O UPDATE)
-        document.getElementById('formCast').onsubmit = async (e) => {
-            e.preventDefault();
-            
-            // Si está disabled, el .value no se envía en FormData, así que usamos currentData
-            const data = {
-                movie_id: document.getElementById('selectMovie').value || currentData.movie_id,
-                person_id: document.getElementById('selectPerson').value || currentData.person_id,
-                role_id: document.getElementById('selectRole').value
-            };
+    function cerrarModalCast() {
+        document.getElementById('modalCast').style.display = 'none';
+    }
 
-            const url = editMode ? '../api/update_cast.php' : '../api/save_cast.php';
-
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const result = await res.json();
-
-                if (result.status === "success") {
-                    cerrarModalCast();
-                    cargarTablaCast();
-                } else {
-                    alert("Error: " + result.message);
-                }
-            } catch (error) {
-                console.error("Error al guardar:", error);
-            }
+    // 4A. GUARDAR NUEVA PERSONA + VINCULAR
+    document.getElementById('formNuevaPerson').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = {
+            nombre:   document.getElementById('nombreNuevo').value.trim(),
+            movie_id: document.getElementById('selectMovieNueva').value,
+            role_id:  document.getElementById('selectRoleNueva').value
         };
 
-        // 5. ELIMINAR
-        async function eliminarVinculo(movie_id, person_id) {
-            if(!confirm("¿Retirar a esta persona del reparto?")) return;
-            try {
-                const res = await fetch(`../api/delete_cast.php?movie_id=${movie_id}&person_id=${person_id}`);
-                const result = await res.json();
-                if(result.status === "success") {
-                    cargarTablaCast();
-                } else {
-                    alert("Error al eliminar");
-                }
-            } catch (error) {
-                console.error("Error al eliminar:", error);
+        try {
+            const res = await fetch('../api/save_person_and_cast.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (result.success) {
+                alert(result.message || "Persona registrada y vinculada.");
+                cerrarModalCast();
+                cargarTablaCast();
+            } else {
+                alert("Error: " + (result.error || "No se pudo guardar"));
             }
-        }
+        } catch (e) { console.error(e); }
+    };
 
-        window.onload = cargarTablaCast;
-    </script>
+    // 4B. GUARDAR VÍNCULO EXISTENTE / EDITAR
+    document.getElementById('formCast').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = {
+            movie_id:  document.getElementById('selectMovie').value  || currentData.movie_id,
+            person_id: document.getElementById('selectPerson').value || currentData.person_id,
+            role_id:   document.getElementById('selectRole').value
+        };
+        const url = editMode ? '../api/update_cast.php' : '../api/save_cast.php';
+
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (result.status === "success") {
+                cerrarModalCast();
+                cargarTablaCast();
+            } else {
+                alert("Error: " + result.message);
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    // 5. ELIMINAR
+    async function eliminarVinculo(movie_id, person_id) {
+        if (!confirm("¿Retirar a esta persona del reparto?")) return;
+        try {
+            const res = await fetch(`../api/delete_cast.php?movie_id=${movie_id}&person_id=${person_id}`);
+            const result = await res.json();
+            if (result.status === "success") cargarTablaCast();
+            else alert("Error al eliminar");
+        } catch (e) { console.error(e); }
+    }
+
+    window.onload = cargarTablaCast;
+</script>
 </body>
 </html>

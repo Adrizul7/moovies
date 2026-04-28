@@ -1,24 +1,25 @@
 <?php
 header('Content-Type: application/json');
-require_once __DIR__ . '/util/conec.php'; 
+require_once __DIR__ . '/util/conec.php';
+
+$role_id = isset($_GET['role_id']) ? (int)$_GET['role_id'] : 2; // default director
 
 try {
     $conexionObj = new ConexionBD();
     $db = $conexionObj->getConexion();
-    
-    // Usamos DISTINCT para evitar nombres duplicados si alguien dirigió varias películas
+
     $sql = "SELECT DISTINCT p.id, p.name 
             FROM people p
             INNER JOIN movie_cast mc ON p.id = mc.person_id
-            WHERE mc.role_id = 2 
+            WHERE mc.role_id = ?
             ORDER BY p.name ASC";
-            
-    $stmt = $db->query($sql);
-    $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    echo json_encode($resultados);
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute([$role_id]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
 
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(array("error" => $e->getMessage()));
+    echo json_encode(["error" => $e->getMessage()]);
 }
+exit;

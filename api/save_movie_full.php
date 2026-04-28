@@ -35,6 +35,24 @@ try {
         $stmtCast->execute(array($movieId, $data['director_id'], 2)); 
     }
 
+        if (!empty($data['actor_id'])) {
+        $sqlCast = "INSERT INTO movie_cast (movie_id, person_id, role_id) VALUES (?, ?, ?)";
+        $stmtCast = $db->prepare($sqlCast);
+        $stmtCast->execute(array($movieId, $data['actor_id'], 1)); 
+    }
+
+        if (!empty($data['writer_id'])) {
+        $sqlCast = "INSERT INTO movie_cast (movie_id, person_id, role_id) VALUES (?, ?, ?)";
+        $stmtCast = $db->prepare($sqlCast);
+        $stmtCast->execute(array($movieId, $data['writer_id'], 3)); 
+    }
+
+        if (!empty($data['composer_id'])) {
+        $sqlCast = "INSERT INTO movie_cast (movie_id, person_id, role_id) VALUES (?, ?, ?)";
+        $stmtCast = $db->prepare($sqlCast);
+        $stmtCast->execute(array($movieId, $data['composer_id'], 4)); 
+    }
+
     if (!empty($data['genre_id'])) {
         $sqlGenre = "INSERT INTO movies_genres (movie_id, genre_id) VALUES (?, ?)";
         $stmtGenre = $db->prepare($sqlGenre);

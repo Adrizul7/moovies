@@ -22,6 +22,21 @@ try {
     $db->prepare("INSERT INTO movie_cast (movie_id, person_id, role_id) VALUES (?, ?, 2)")
        ->execute(array($data['id'], $data['director_id']));
 
+        // 2. Actualizar Actor en 'movie_cast' (Borrar el viejo de esa peli y poner el nuevo)
+    $db->prepare("DELETE FROM movie_cast WHERE movie_id = ? AND role_id = 1")->execute(array($data['id']));
+    $db->prepare("INSERT INTO movie_cast (movie_id, person_id, role_id) VALUES (?, ?, 1)")
+       ->execute(array($data['id'], $data['actor_id']));
+
+        // 2. Actualizar Writer en 'movie_cast' (Borrar el viejo de esa peli y poner el nuevo)
+    $db->prepare("DELETE FROM movie_cast WHERE movie_id = ? AND role_id = 3")->execute(array($data['id']));
+    $db->prepare("INSERT INTO movie_cast (movie_id, person_id, role_id) VALUES (?, ?, 3)")
+       ->execute(array($data['id'], $data['writer_id']));
+
+        // 2. Actualizar Composer en 'movie_cast' (Borrar el viejo de esa peli y poner el nuevo)
+    $db->prepare("DELETE FROM movie_cast WHERE movie_id = ? AND role_id = 4")->execute(array($data['id']));
+    $db->prepare("INSERT INTO movie_cast (movie_id, person_id, role_id) VALUES (?, ?, 4)")
+       ->execute(array($data['id'], $data['composer_id']));
+
     // 3. Actualizar Género en 'movies_genres'
     $db->prepare("DELETE FROM movies_genres WHERE movie_id = ?")->execute(array($data['id']));
     $db->prepare("INSERT INTO movies_genres (movie_id, genre_id) VALUES (?, ?)")
